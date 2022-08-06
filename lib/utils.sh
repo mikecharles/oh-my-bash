@@ -317,6 +317,7 @@ _omb_util_prompt_command_hook() {
     _omb_util_setexit "$status" "$lastarg"
     eval -- "$hook"
   done
+  _omb_util_setexit "$status"
 }
 
 _omb_util_unload_hook+=('_omb_util_prompt_command=()')
@@ -386,4 +387,16 @@ _omb_util_glob_expand() {
   [[ :$shopt: != *:nullglob:* ]] && shopt -u nullglob
   [[ :$shopt: == *:failglob:* ]] && shopt -s failglob
   return 0
+}
+
+_omb_util_alias() {
+  case ${OMB_DEFAULT_ALIASES:-enable} in
+  (disable) return 0 ;;
+  (check) alias -- "${1%%=*}" &>/dev/null && return 0 ;;
+  (enable) ;;
+  (*)
+    _omb_log_error "invalid value: OMB_DEFAULT_ALIASES='${OMB_DEFAULT_ALIASES-}' (expect: enable|disable|check)" >&2
+    return 2
+  esac
+  alias -- "$1"
 }
