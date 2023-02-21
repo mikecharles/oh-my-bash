@@ -20,21 +20,21 @@ elif ((BASH_VERSINFO[0] < 4)); then
   printf "Warning: Why don't you upgrade your Bash to 4 or higher?\n" >&2
 fi
 
-_omb_install_print_version() {
+function _omb_install_print_version {
   local OMB_VERSINFO
   OMB_VERSINFO=(1 0 0 0 master noarch)
   printf '%s\n' 'Install script for Oh-My-Bash (https://github.com/ohmybash/oh-my-bash)'
   printf 'oh-my-bash, version %s.%s.%s(%s)-%s (%s)\n' "${OMB_VERSINFO[@]}"
 }
 
-_omb_install_print_usage() {
+function _omb_install_print_usage {
   printf '%s\n' \
     'usage: ./install.sh [--unattended | --dry-run | --help | --usage | --version]' \
     'usage: bash -c "$(< install.sh)" [--unattended | --dry-run | --help | --usage |' \
     '           --version]'
 }
 
-_omb_install_print_help() {
+function _omb_install_print_help {
   _omb_install_print_version
   _omb_install_print_usage
   printf '%s\n' \
@@ -52,7 +52,7 @@ _omb_install_print_help() {
 ## @fn _omb_install_readargs [options...]
 ##   @var[out] install_opts
 ##   @var[out] install_prefix
-_omb_install_readargs() {
+function _omb_install_readargs {
   install_opts=
   install_prefix=
   while (($#)); do
@@ -101,7 +101,7 @@ _omb_install_readargs() {
   done
 }
 
-_omb_install_run() {
+function _omb_install_run {
   if [[ :$install_opts: == *:dry-run:* ]]; then
     printf '%s\n' "$BOLD$GREEN[dryrun]$NORMAL $BOLD$*$NORMAL" >&5
   else
@@ -110,7 +110,7 @@ _omb_install_run() {
   fi
 }
 
-_omb_install_banner() {
+function _omb_install_banner {
   # MOTD message :)
   printf '%s' "$GREEN"
   printf '%s\n' \
@@ -126,7 +126,7 @@ _omb_install_banner() {
 ## @fn _omb_install_user_bashrc
 ##   @var[in] install_opts
 ##   @var[in] OSH
-_omb_install_user_bashrc() {
+function _omb_install_user_bashrc {
   printf "${BLUE}Looking for an existing bash config...${NORMAL}\n"
   if [[ -f ~/.bashrc || -h ~/.bashrc ]]; then
     local bashrc_backup=~/.bashrc.omb-backup-$(date +%Y%m%d%H%M%S)
@@ -134,12 +134,23 @@ _omb_install_user_bashrc() {
     _omb_install_run mv ~/.bashrc "$bashrc_backup"
   fi
 
-  printf "${BLUE}Using the Oh My Bash template file and adding it to ~/.bashrc${NORMAL}\n"
-  _omb_install_run cp "$OSH"/templates/bashrc.osh-template ~/.bashrc
+  printf "${BLUE}Copying the Oh-My-Bash template file to ~/.bashrc${NORMAL}\n"
   sed "/^export OSH=/ c\\
 export OSH='${OSH//\'/\'\\\'\'}'
-  " ~/.bashrc >| ~/.bashrc.omb-temp
-  _omb_install_run mv -f ~/.bashrc.omb-temp ~/.bashrc
+  " "$OSH"/templates/bashrc.osh-template >| ~/.bashrc.omb-temp &&
+    _omb_install_run mv -f ~/.bashrc.omb-temp ~/.bashrc
+
+  # If no file is found at ~/.bash_profile, we create it with the default
+  # content.
+  if [[ ! -e ~/.bash_profile ]]; then
+    if [[ -h ~/.bash_profile ]]; then
+      _omb_install_run rm -f ~/.bash_profile
+    fi
+    _omb_install_run mv -f "$OSH"/templates/bash_profile.osh-template ~/.bash_profile
+  else
+    command grep -qE '(source|\.)[[:space:]].*/\.bashrc' ~/.bash_profile 2>/dev/null ||
+      printf '%s\n' "${GREEN}Please make sure that ~/.bash_profile contains \"source ~/.bashrc\"${NORMAL}"
+  fi
 
   set +e
   _omb_install_banner
@@ -158,7 +169,7 @@ export OSH='${OSH//\'/\'\\\'\'}'
   fi
 }
 
-_omb_install_system_bashrc() {
+function _omb_install_system_bashrc {
   printf "${BLUE}Creating a bashrc template at '$OSH/bashrc'...${NORMAL}\n"
   local q=\' Q="'\''"
   local osh="'${OSH//$q/$Q}'"
@@ -173,7 +184,7 @@ _omb_install_system_bashrc() {
   printf "${BLUE}${BOLD}%s${NORMAL}\n" "To keep up on the latest news and updates, follow us on GitHub: https://github.com/ohmybash/oh-my-bash"
 }
 
-_omb_install_main() {
+function _omb_install_main {
   # Use colors, but only if connected to a terminal, and that terminal
   # supports them.
   if type -P tput &>/dev/null; then
