@@ -6,14 +6,17 @@ if [ -z "${BASH_VERSION-}" ]; then
   printf "Error: Bash 3.2 or higher is required for Oh My Bash.\n"
   printf "Error: Install Bash and try running this installation script with Bash.\n"
   if command -v bash >/dev/null 2>&1; then
+    # shellcheck disable=SC2016
     printf 'Example: \033[31;1mbash\033[0;34m -c "$(curl -fsSL https://raw.githubusercontent.com/ohmybash/oh-my-bash/master/tools/install.sh)"\n'
   fi
+  # shellcheck disable=SC2317
   return 1 >/dev/null 2>&1 || exit 1
 fi
 
 if [[ ! ${BASH_VERSINFO[0]-} ]] || ((BASH_VERSINFO[0] < 3 || BASH_VERSINFO[0] == 3 && BASH_VERSINFO[1] < 2)); then
   printf "Error: Bash 3.2 required for Oh My Bash.\n" >&2
   printf "Error: Upgrade Bash and try again.\n" >&2
+  # shellcheck disable=SC2317
   return 2 &>/dev/null || exit 2
 elif ((BASH_VERSINFO[0] < 4)); then
   printf "Warning: Bash >=4 is no longer required for Oh My Bash but is cool to have ;)\n" >&2
@@ -28,6 +31,7 @@ function _omb_install_print_version {
 }
 
 function _omb_install_print_usage {
+  # shellcheck disable=SC2016
   printf '%s\n' \
     'usage: ./install.sh [--unattended | --dry-run | --help | --usage | --version]' \
     'usage: bash -c "$(< install.sh)" [--unattended | --dry-run | --help | --usage |' \
@@ -113,6 +117,7 @@ function _omb_install_run {
 function _omb_install_banner {
   # MOTD message :)
   printf '%s' "$GREEN"
+  # shellcheck disable=SC1003,SC2016
   printf '%s\n' \
     '         __                          __               __  ' \
     '  ____  / /_     ____ ___  __  __   / /_  ____ ______/ /_ ' \
@@ -123,45 +128,65 @@ function _omb_install_banner {
   printf '%s' "$NORMAL"
 }
 
+function _omb_install_has_proper_bash_profile {
+  if [[ -s ~/.bash_profile ]]; then
+    if command grep -qE '(source|\.)[[:space:]].*/\.bashrc' ~/.bash_profile 2>/dev/null; then
+      return 0
+    fi
+  fi
+
+  if [[ -s ~/.profile ]]; then
+    if command grep -qE '(source|\.)[[:space:]].*/\.bashrc' ~/.profile 2>/dev/null; then
+      return 0
+    fi
+  fi
+    
+  return 1
+}
+
 ## @fn _omb_install_user_bashrc
 ##   @var[in] install_opts
 ##   @var[in] OSH
 function _omb_install_user_bashrc {
-  printf "${BLUE}Looking for an existing bash config...${NORMAL}\n"
+  printf '%s\n' "${BLUE}Looking for an existing bash config...${NORMAL}"
   if [[ -f ~/.bashrc || -h ~/.bashrc ]]; then
+    # shellcheck disable=SC2155
     local bashrc_backup=~/.bashrc.omb-backup-$(date +%Y%m%d%H%M%S)
-    printf "${YELLOW}Found ~/.bashrc.${NORMAL} ${GREEN}Backing up to $bashrc_backup${NORMAL}\n"
+    printf '%s\n' "${YELLOW}Found ~/.bashrc.${NORMAL} ${GREEN}Backing up to $bashrc_backup${NORMAL}"
     _omb_install_run mv ~/.bashrc "$bashrc_backup"
   fi
 
-  printf "${BLUE}Copying the Oh-My-Bash template file to ~/.bashrc${NORMAL}\n"
+  printf '%s\n' "${BLUE}Copying the Oh-My-Bash template file to ~/.bashrc${NORMAL}"
   sed "/^export OSH=/ c\\
 export OSH='${OSH//\'/\'\\\'\'}'
   " "$OSH"/templates/bashrc.osh-template >| ~/.bashrc.omb-temp &&
     _omb_install_run mv -f ~/.bashrc.omb-temp ~/.bashrc
 
-  # If no file is found at ~/.bash_profile, we create it with the default
-  # content.
-  if [[ ! -e ~/.bash_profile ]]; then
-    if [[ -h ~/.bash_profile ]]; then
-      _omb_install_run rm -f ~/.bash_profile
-    fi
-    _omb_install_run mv -f "$OSH"/templates/bash_profile.osh-template ~/.bash_profile
-  else
-    command grep -qE '(source|\.)[[:space:]].*/\.bashrc' ~/.bash_profile 2>/dev/null ||
+  # If "source ~/.bashrc" is not found in ~/.bash_profile or ~/.profile, we try
+  # to create a new ~/.bash_profile with the default content or show messages
+  # for user to add "source ~/.bashrc" in the existing ~/.bash_profile.
+  if ! _omb_install_has_proper_bash_profile; then
+    if [[ ! -e ~/.bash_profile ]]; then
+      if [[ -h ~/.bash_profile ]]; then
+        _omb_install_run rm -f ~/.bash_profile
+      fi
+      _omb_install_run cp -f "$OSH"/templates/bash_profile.osh-template ~/.bash_profile
+    else
       printf '%s\n' "${GREEN}Please make sure that ~/.bash_profile contains \"source ~/.bashrc\"${NORMAL}"
+    fi
   fi
 
   set +e
   _omb_install_banner
   printf '%s\n' "${GREEN}Please look over the ~/.bashrc file to select a theme, plugins, completions, aliases, and options${NORMAL}"
-  printf "${BLUE}${BOLD}%s${NORMAL}\n" "To keep up on the latest news and updates, follow us on GitHub: https://github.com/ohmybash/oh-my-bash"
+  printf '%s\n' "${BLUE}${BOLD}To keep up on the latest news and updates, follow us on GitHub: https://github.com/ohmybash/oh-my-bash${NORMAL}"
 
   if [[ :$install_opts: == *:dry-run:* ]]; then
     printf '%s\n' "$GREEN$BOLD[dryrun]$NORMAL Sample bashrc is created at '$BOLD$HOME/.bashrc-ombtemp$NORMAL'."
   elif [[ :$install_opts: != *:unattended:* ]]; then
     if [[ $- == *i* ]]; then
       # In case install.sh is sourced from the interactive Bash
+      # shellcheck disable=SC1090
       source ~/.bashrc
     else
       exec bash
@@ -170,7 +195,7 @@ export OSH='${OSH//\'/\'\\\'\'}'
 }
 
 function _omb_install_system_bashrc {
-  printf "${BLUE}Creating a bashrc template at '$OSH/bashrc'...${NORMAL}\n"
+  printf '%s\n' "${BLUE}Creating a bashrc template at '$OSH/bashrc'...${NORMAL}"
   local q=\' Q="'\''"
   local osh="'${OSH//$q/$Q}'"
   osh=${osh//$'\n'/$'\\\n'}
@@ -181,30 +206,32 @@ function _omb_install_system_bashrc {
   _omb_install_banner
   printf '%s\n' "${GREEN}To enable Oh My Bash, please copy '${BOLD}$OSH/bashrc${NORMAL}${GREEN}' to '${BOLD}~/.bashrc${NORMAL}${GREEN}'.${NORMAL}"
   printf '%s\n' "${GREEN}Please look over the ~/.bashrc file to select a theme, plugins, completions, aliases, and options${NORMAL}"
-  printf "${BLUE}${BOLD}%s${NORMAL}\n" "To keep up on the latest news and updates, follow us on GitHub: https://github.com/ohmybash/oh-my-bash"
+  printf '%s\n' "${BLUE}${BOLD}To keep up on the latest news and updates, follow us on GitHub: https://github.com/ohmybash/oh-my-bash${NORMAL}"
 }
 
 function _omb_install_main {
   # Use colors, but only if connected to a terminal, and that terminal
   # supports them.
+  local ncolors=
   if type -P tput &>/dev/null; then
-    local ncolors=$(tput colors 2>/dev/null || tput Co 2>/dev/null || echo -1)
+    ncolors=$(tput colors 2>/dev/null || tput Co 2>/dev/null || echo -1)
   fi
 
-  if [[ -t 1 && -n $ncolors && $ncolors -ge 8 ]]; then
-    local RED=$(tput setaf 1 2>/dev/null || tput AF 1 2>/dev/null)
-    local GREEN=$(tput setaf 2 2>/dev/null || tput AF 2 2>/dev/null)
-    local YELLOW=$(tput setaf 3 2>/dev/null || tput AF 3 2>/dev/null)
-    local BLUE=$(tput setaf 4 2>/dev/null || tput AF 4 2>/dev/null)
-    local BOLD=$(tput bold 2>/dev/null || tput md 2>/dev/null)
-    local NORMAL=$(tput sgr0 2>/dev/null || tput me 2>/dev/null)
+  local RED GREEN YELLOW BLUE BOLD NORMAL
+  if [[ -t 1 && $ncolors && $ncolors -ge 8 ]]; then
+    RED=$(tput setaf 1 2>/dev/null || tput AF 1 2>/dev/null)
+    GREEN=$(tput setaf 2 2>/dev/null || tput AF 2 2>/dev/null)
+    YELLOW=$(tput setaf 3 2>/dev/null || tput AF 3 2>/dev/null)
+    BLUE=$(tput setaf 4 2>/dev/null || tput AF 4 2>/dev/null)
+    BOLD=$(tput bold 2>/dev/null || tput md 2>/dev/null)
+    NORMAL=$(tput sgr0 2>/dev/null || tput me 2>/dev/null)
   else
-    local RED=""
-    local GREEN=""
-    local YELLOW=""
-    local BLUE=""
-    local BOLD=""
-    local NORMAL=""
+    RED=""
+    GREEN=""
+    YELLOW=""
+    BLUE=""
+    BOLD=""
+    NORMAL=""
   fi
 
   local install_opts install_prefix
@@ -263,13 +290,13 @@ function _omb_install_main {
   # precedence over umasks except for filesystems mounted with option "noacl".
   umask g-w,o-w
 
-  printf "${BLUE}Cloning Oh My Bash...${NORMAL}\n"
+  printf '%s\n' "${BLUE}Cloning Oh My Bash...${NORMAL}"
   type -P git &>/dev/null || {
     echo "Error: git is not installed"
     return 1
   }
   # The Windows (MSYS) Git is not compatible with normal use on cygwin
-  if [[ $OSTYPE = cygwin ]]; then
+  if [[ $OSTYPE == cygwin ]]; then
     if command git --version | command grep msysgit > /dev/null; then
       echo "Error: Windows/MSYS Git is not supported on Cygwin"
       echo "Error: Make sure the Cygwin git package is installed and is first on the path"
